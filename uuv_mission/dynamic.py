@@ -104,6 +104,9 @@ class ClosedLoop:
             positions[t] = self.plant.get_position()
             observation_t = self.plant.get_depth()
             # Call your controller here
+            reference_t = mission.reference[t]
+            dt = self.plant.dt
+            actions[t] = self.controller.compute(observation_t,reference_t,dt)
             self.plant.transition(actions[t], disturbances[t])
 
         return Trajectory(positions)
@@ -111,3 +114,20 @@ class ClosedLoop:
     def simulate_with_random_disturbances(self, mission: Mission, variance: float = 0.5) -> Trajectory:
         disturbances = np.random.normal(0, variance, len(mission.reference))
         return self.simulate(mission, disturbances)
+
+class Control:
+    def __init__(self,kp,kd):
+        self.kp = kp
+        self.kd = kd
+        # initialize previous error, zero ICs
+        self.previous_error = 0
+
+    def compute(self,observation,reference,dt):
+        # controller action
+        self.dt = dt
+        current_error = reference - observation
+        derivative = (current_error - self.previous_error)/self.dt
+        action = self.kp*current_error + self.kd*derivative
+        # set error for next time step
+        self.previous_error = current_error
+        return action
